@@ -16,6 +16,7 @@ extern crate rand;
  */
 type Piece = Vec<Vec<u8>>;
 
+#[derive(Clone)]
 pub struct Tetrimino {
     pub states: Vec<Piece>,
     pub x: isize,

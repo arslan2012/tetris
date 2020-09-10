@@ -3,6 +3,7 @@ mod file_io;
 mod tetrimino;
 mod tetris;
 mod event;
+mod texture_group;
 
 use create_texture::{create_texture_rect, display_game_information};
 use tetris::{Tetris, is_time_over};
@@ -15,7 +16,7 @@ extern crate sdl2;
 use sdl2::pixels::Color;
 use std::time::{Duration, SystemTime};
 use std::thread::sleep;
-use sdl2::render::TextureCreator;
+use sdl2::render::{TextureCreator, Texture, BlendMode};
 use sdl2::rect::Rect;
 use sdl2::image::{LoadTexture, InitFlag as ImageFlag};
 use sdl2::mixer::{
@@ -26,6 +27,7 @@ use sdl2::mixer::{
     DEFAULT_FORMAT,
     DEFAULT_CHANNELS,
 };
+use crate::texture_group::TextureGroup;
 
 const TETRIS_HEIGHT: u32 = 40;
 const NB_HIGHSCORES: usize = 5;
@@ -121,36 +123,38 @@ fn main() {
     let music = Music::from_file("assets/theme.ogg").expect("Couldn't load theme song");
     music.play(-1).expect("Couldn't play theme song");
 
-    let grid = create_texture_rect(
-        &mut canvas,
-        &texture_creator,
-        0, 0, 0,
-        ARENA_WIDTH,
-        ARENA_HEIGHT,
-    ).expect("Failed to create a texture");
-
-    let border = create_texture_rect(
+    let mut arena = TextureGroup::new();
+    arena.add(create_texture_rect(
         &mut canvas,
         &texture_creator,
         255, 255, 255,
         ARENA_WIDTH + 20,
         ARENA_HEIGHT + 20,
-    ).expect("Failed to create a texture");
-
-    let block_grid = create_texture_rect(
+    ).expect("Failed to create a texture"), -10, -10);
+    arena.add(create_texture_rect(
         &mut canvas,
         &texture_creator,
         0, 0, 0,
-        BLOCK_WIDTH,
-        BLOCK_WIDTH,
-    ).expect("Failed to create a texture");
-    let block_border = create_texture_rect(
+        ARENA_WIDTH,
+        ARENA_HEIGHT,
+    ).expect("Failed to create a texture"), 0 ,0);
+
+    let mut small_preview_area = TextureGroup::new();
+    small_preview_area.add(create_texture_rect(
         &mut canvas,
         &texture_creator,
         255, 255, 255,
         BLOCK_WIDTH + 20,
         BLOCK_WIDTH + 20,
-    ).expect("Failed to create a texture");
+    ).expect("Failed to create a texture"), -10, -10);
+
+    small_preview_area.add(create_texture_rect(
+        &mut canvas,
+        &texture_creator,
+        0, 0, 0,
+        BLOCK_WIDTH,
+        BLOCK_WIDTH,
+    ).expect("Failed to create a texture"), 0, 0);
 
     let ttf_context = sdl2::ttf::init().expect("SDL TTF initialization failed");
     let font = ttf_context.load_font(
@@ -170,12 +174,27 @@ fn main() {
         )
       }
 
-    let textures = [
-        texture!(255, 69, 69), texture!(255, 220, 69),
-        texture!(237, 150, 37), texture!(171, 99, 237),
-        texture!(77, 149, 239), texture!(39, 218, 225),
-        texture!(45, 216, 47)
+    let colour_of_piece = [
+        (255, 69, 69), (255, 220, 69),
+        (237, 150, 37),(171, 99, 237),
+        (77, 149, 239),(39, 218, 225),
+        (45, 216, 47)
     ];
+
+    let textures: Vec<Texture> = colour_of_piece
+        .iter()
+        .map(|c| texture!(c.0, c.1, c.2))
+        .collect();
+
+    let textures_alpha: Vec<Texture> = colour_of_piece
+        .iter()
+        .map(|c| {
+            let mut t = texture!(c.0, c.1, c.2);
+            t.set_alpha_mod(70);
+            t.set_blend_mode(BlendMode::Blend);
+            t
+        })
+        .collect();
 
     loop {
         if is_time_over(&tetris, &timer) {
@@ -198,47 +217,11 @@ fn main() {
         canvas.copy(&image_texture, None, None).expect("Render failed");
 
         //hold piece
-        canvas.copy(&block_border,
-                    None,
-                    Rect::new(HOLD_X as i32 - 10,
-                              BLOCK_Y - 10,
-                              BLOCK_WIDTH + 20, BLOCK_WIDTH + 20))
-            .expect("Couldn't copy texture into window");
-        canvas.copy(&block_grid,
-                    None,
-                    Rect::new(HOLD_X as i32,
-                              BLOCK_Y,
-                              BLOCK_WIDTH, BLOCK_WIDTH))
-            .expect("Couldn't copy texture into window");
-
+        small_preview_area.copy_to_canvas(&mut canvas, HOLD_X as i32, BLOCK_Y);
         //arena
-        canvas.copy(&border,
-                    None,
-                    Rect::new(ARENA_X as i32 - 10,
-                              (WINDOW_HEIGHT - ARENA_HEIGHT) as i32 / 2 - 10,
-                              ARENA_WIDTH + 20, ARENA_HEIGHT + 20))
-            .expect("Couldn't copy texture into window");
-        canvas.copy(&grid,
-                    None,
-                    Rect::new(ARENA_X as i32,
-                              (WINDOW_HEIGHT - ARENA_HEIGHT) as i32 / 2,
-                              ARENA_WIDTH, ARENA_HEIGHT))
-            .expect("Couldn't copy texture into window");
-
+        arena.copy_to_canvas(&mut canvas, ARENA_X as i32, (WINDOW_HEIGHT - ARENA_HEIGHT) as i32 / 2);
         //next piece
-        canvas.copy(&block_border,
-                    None,
-                    Rect::new(NEXT_X as i32 - 10,
-                              BLOCK_Y - 10,
-                              BLOCK_WIDTH + 20, BLOCK_WIDTH + 20))
-            .expect("Couldn't copy texture into window");
-        canvas.copy(&block_grid,
-                    None,
-                    Rect::new(NEXT_X as i32,
-                              BLOCK_Y,
-                              BLOCK_WIDTH, BLOCK_WIDTH))
-            .expect("Couldn't copy texture into window");
-
+        small_preview_area.copy_to_canvas(&mut canvas, NEXT_X as i32, BLOCK_Y);
 
         if tetris.current_piece.is_none() {
             if !&tetris.next_piece.test_current_position(&tetris.game_map) {
@@ -249,6 +232,8 @@ fn main() {
             tetris.next_piece = create_new_tetrimino();
         }
         let mut quit = false;
+
+        // current piece
         if !handle_events(&mut tetris, &mut quit, &mut timer,
                           &mut event_pump) {
             if let Some(ref mut piece) = tetris.current_piece {
@@ -306,7 +291,32 @@ fn main() {
                     .expect("Couldn't copy texture into window");
             }
         }
+        // ghost
+        if let Some(ref current_piece) = tetris.current_piece {
+            let mut piece = current_piece.clone();
+            let mut y = piece.y;
+            while piece.change_position(&tetris.game_map, piece.x, y + 1)
+                == true {
+                y += 1;
+            }
+            for (line_nb, line) in piece.states[piece.current_state
+                as usize].iter().enumerate() {
+                for (case_nb, case) in line.iter().enumerate() {
+                    if *case == 0 {
+                        continue;
+                    }
+                    canvas.copy(&textures_alpha[*case as usize - 1],
+                                None,
+                                Rect::new(grid_x + (piece.x + case_nb as isize) as i32 * TETRIS_HEIGHT as i32,
+                                          grid_y + (piece.y + line_nb) as i32 * TETRIS_HEIGHT
+                                              as i32,
+                                          TETRIS_HEIGHT, TETRIS_HEIGHT))
+                        .expect("Couldn't copy texture into window");
+                }
+            }
+        }
 
+        // fallen pieces
         for (line_nb, line) in tetris.game_map.iter().enumerate() {
             for (case_nb, case) in line.iter().enumerate() {
                 if *case == 0 {
