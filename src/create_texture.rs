@@ -3,6 +3,8 @@ use sdl2::video::{Window, WindowContext};
 use sdl2::pixels::Color;
 use sdl2::rect::Rect;
 use crate::tetris::Tetris;
+use crate::texture_group::TextureGroup;
+use crate::TETRIS_HEIGHT;
 
 pub fn create_texture_rect<'a>(
     canvas: &mut Canvas<Window>,
@@ -20,6 +22,36 @@ pub fn create_texture_rect<'a>(
     } else {
         None
     }
+}
+
+pub fn create_tetrimino_texture<'a>(
+    canvas: &mut Canvas<Window>,
+    texture_creator: &'a TextureCreator<WindowContext>,
+    r: u8, g: u8, b: u8,
+) -> TextureGroup<'a> {
+    let mut tg = TextureGroup::new();
+    tg.add(create_texture_rect(
+        canvas,
+        texture_creator,
+        r, g, b,
+        TETRIS_HEIGHT,
+        TETRIS_HEIGHT,
+    ).unwrap(), 0, 0);
+    tg.add(create_texture_rect(
+        canvas,
+        texture_creator,
+        (r as u16 * 2 / 4) as u8, (g as u16 * 2 / 4) as u8, (b as u16 * 2 / 4) as u8,
+        TETRIS_HEIGHT * 3/4,
+        TETRIS_HEIGHT * 3/4,
+    ).unwrap(), (TETRIS_HEIGHT / 8 + 1) as i32, (TETRIS_HEIGHT / 8 + 1) as i32);
+    tg.add(create_texture_rect(
+        canvas,
+        texture_creator,
+        (r as u16 * 3 / 4) as u8, (g as u16 * 3 / 4) as u8, (b as u16 * 3 / 4) as u8,
+        TETRIS_HEIGHT * 3/4,
+        TETRIS_HEIGHT * 3/4,
+    ).unwrap(), (TETRIS_HEIGHT / 8) as i32, (TETRIS_HEIGHT / 8) as i32);
+    tg
 }
 
 fn create_texture_from_text<'a>(

@@ -5,7 +5,7 @@ mod tetris;
 mod event;
 mod texture_group;
 
-use create_texture::{create_texture_rect, display_game_information};
+use create_texture::{create_texture_rect, create_tetrimino_texture, display_game_information};
 use tetris::{Tetris, is_time_over};
 use tetrimino::create_new_tetrimino;
 use file_io::{save_highscores_and_lines, load_highscores_and_lines};
@@ -16,8 +16,7 @@ extern crate sdl2;
 use sdl2::pixels::Color;
 use std::time::{Duration, SystemTime};
 use std::thread::sleep;
-use sdl2::render::{TextureCreator, Texture, BlendMode};
-use sdl2::rect::Rect;
+use sdl2::render::{TextureCreator};
 use sdl2::image::{LoadTexture, InitFlag as ImageFlag};
 use sdl2::mixer::{
     Music,
@@ -137,7 +136,7 @@ fn main() {
         0, 0, 0,
         ARENA_WIDTH,
         ARENA_HEIGHT,
-    ).expect("Failed to create a texture"), 0 ,0);
+    ).expect("Failed to create a texture"), 0, 0);
 
     let mut small_preview_area = TextureGroup::new();
     small_preview_area.add(create_texture_rect(
@@ -164,34 +163,31 @@ fn main() {
 
     macro_rules! texture {
         ($r:expr, $g:expr, $b:expr) => (
-            create_texture_rect(
+            create_tetrimino_texture(
                 &mut canvas,
                 &texture_creator,
-                $r, $g, $b,
-                TETRIS_HEIGHT,
-                TETRIS_HEIGHT
-            ).unwrap()
+                $r, $g, $b
+            )
         )
       }
 
     let colour_of_piece = [
         (255, 69, 69), (255, 220, 69),
-        (237, 150, 37),(171, 99, 237),
-        (77, 149, 239),(39, 218, 225),
+        (237, 150, 37), (171, 99, 237),
+        (77, 149, 239), (39, 218, 225),
         (45, 216, 47)
     ];
 
-    let textures: Vec<Texture> = colour_of_piece
+    let textures: Vec<TextureGroup> = colour_of_piece
         .iter()
         .map(|c| texture!(c.0, c.1, c.2))
         .collect();
 
-    let textures_alpha: Vec<Texture> = colour_of_piece
+    let textures_alpha: Vec<TextureGroup> = colour_of_piece
         .iter()
         .map(|c| {
             let mut t = texture!(c.0, c.1, c.2);
-            t.set_alpha_mod(70);
-            t.set_blend_mode(BlendMode::Blend);
+            t.set_alpha(70);
             t
         })
         .collect();
@@ -243,13 +239,10 @@ fn main() {
                         if *case == 0 {
                             continue;
                         }
-                        canvas.copy(&textures[*case as usize - 1],
-                                    None,
-                                    Rect::new(grid_x + (piece.x + case_nb as isize) as i32 * TETRIS_HEIGHT as i32,
-                                              grid_y + (piece.y + line_nb) as i32 * TETRIS_HEIGHT
-                                                  as i32,
-                                              TETRIS_HEIGHT, TETRIS_HEIGHT))
-                            .expect("Couldn't copy texture into window");
+                        textures[*case as usize - 1].copy_to_canvas(
+                            &mut canvas,
+                            grid_x + (piece.x + case_nb as isize) as i32 * TETRIS_HEIGHT as i32,
+                            grid_y + (piece.y + line_nb) as i32 * TETRIS_HEIGHT as i32);
                     }
                 }
             }
@@ -266,12 +259,10 @@ fn main() {
                     if *case == 0 {
                         continue;
                     }
-                    canvas.copy(&textures[*case as usize - 1],
-                                None,
-                                Rect::new(HOLD_X as i32 + 20 + case_nb as i32 * TETRIS_HEIGHT as i32,
-                                          BLOCK_Y + 20 + line_nb as i32 * TETRIS_HEIGHT as i32,
-                                          TETRIS_HEIGHT, TETRIS_HEIGHT))
-                        .expect("Couldn't copy texture into window");
+                    textures[*case as usize - 1].copy_to_canvas(
+                        &mut canvas,
+                        HOLD_X as i32 + 20 + case_nb as i32 * TETRIS_HEIGHT as i32,
+                        BLOCK_Y + 20 + line_nb as i32 * TETRIS_HEIGHT as i32);
                 }
             }
         }
@@ -283,12 +274,10 @@ fn main() {
                 if *case == 0 {
                     continue;
                 }
-                canvas.copy(&textures[*case as usize - 1],
-                            None,
-                            Rect::new(NEXT_X as i32 + 20 + case_nb as i32 * TETRIS_HEIGHT as i32,
-                                      BLOCK_Y + 20 + line_nb as i32 * TETRIS_HEIGHT as i32,
-                                      TETRIS_HEIGHT, TETRIS_HEIGHT))
-                    .expect("Couldn't copy texture into window");
+                textures[*case as usize - 1].copy_to_canvas(
+                    &mut canvas,
+                    NEXT_X as i32 + 20 + case_nb as i32 * TETRIS_HEIGHT as i32,
+                    BLOCK_Y + 20 + line_nb as i32 * TETRIS_HEIGHT as i32);
             }
         }
         // ghost
@@ -305,13 +294,10 @@ fn main() {
                     if *case == 0 {
                         continue;
                     }
-                    canvas.copy(&textures_alpha[*case as usize - 1],
-                                None,
-                                Rect::new(grid_x + (piece.x + case_nb as isize) as i32 * TETRIS_HEIGHT as i32,
-                                          grid_y + (piece.y + line_nb) as i32 * TETRIS_HEIGHT
-                                              as i32,
-                                          TETRIS_HEIGHT, TETRIS_HEIGHT))
-                        .expect("Couldn't copy texture into window");
+                    textures_alpha[*case as usize - 1].copy_to_canvas(
+                        &mut canvas,
+                        grid_x + (piece.x + case_nb as isize) as i32 * TETRIS_HEIGHT as i32,
+                        grid_y + (piece.y + line_nb) as i32 * TETRIS_HEIGHT as i32);
                 }
             }
         }
@@ -322,12 +308,10 @@ fn main() {
                 if *case == 0 {
                     continue;
                 }
-                canvas.copy(&textures[*case as usize - 1],
-                            None,
-                            Rect::new(grid_x + case_nb as i32 * TETRIS_HEIGHT as i32,
-                                      grid_y + line_nb as i32 * TETRIS_HEIGHT as i32,
-                                      TETRIS_HEIGHT, TETRIS_HEIGHT))
-                    .expect("Couldn't copy texture into window");
+                textures[*case as usize - 1].copy_to_canvas(
+                    &mut canvas,
+                    grid_x + case_nb as i32 * TETRIS_HEIGHT as i32,
+                    grid_y + line_nb as i32 * TETRIS_HEIGHT as i32);
             }
         }
         display_game_information(&tetris, &mut canvas, &texture_creator, &font,

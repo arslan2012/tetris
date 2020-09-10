@@ -1,5 +1,5 @@
 use crate::texture_group::texture_with_relative_position::TextureWithRelativePosition;
-use sdl2::render::{Texture, Canvas};
+use sdl2::render::{Texture, Canvas, BlendMode};
 use sdl2::video::Window;
 use sdl2::rect::Rect;
 
@@ -28,6 +28,13 @@ impl<'a> TextureGroup<'a> {
                                   y + texture_with_relative_position.y,
                                   dimensions.width, dimensions.height))
                 .expect("Couldn't copy texture into window");
+        }
+    }
+
+    pub fn set_alpha(&mut self, alpha: u8) {
+        for texture_with_relative_position in &mut self.textures {
+            texture_with_relative_position.texture.set_alpha_mod(alpha);
+            texture_with_relative_position.texture.set_blend_mode(BlendMode::Blend);
         }
     }
 }
